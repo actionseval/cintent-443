@@ -1,0 +1,70 @@
+name: Backend lint and tests
+
+# CINTENT >> MANUAL_TRIGGER
+# on:
+#   # Run tests only when 'backend' or CI config has changed
+#   push:
+#     paths:
+#       - 'backend/**'
+#       - 'solidago/**'
+#       - '.github/workflows/backend-ci.yml'
+#   pull_request:
+#     paths:
+#       - 'backend/**'
+#       - 'solidago/**'
+#       - '.github/workflows/backend-ci.yml'
+on: [repository_dispatch, workflow_dispatch]
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: tournesol
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      # CINTENT >> INSERT_CINTENT
+      - uses: JavidDitty/setup-cintent@a606c80c34ec190c6a20dea33d6d58ddb6c4e0cc
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r tests/requirements.txt
+
+      - name: Python Code Quality Checks
+        run: ./scripts/ci/lint.sh
+
+      - name: Run pytest
+        run: pytest
+
+      - name: Run bandit
+        run: bandit -r . -c bandit.yaml
+
+      # CINTENT >> INSERT_CINTENT
+      - name: Upload CIntent Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ env.CINTENT_ARTIFACT_NAME }}
+          path: ${{ env.CINTENT_LOGS }}
